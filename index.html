@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SENTINEL AI — Enterprise Email Threat, Phishing & Spam SOC Platform</title>
+  <link rel="stylesheet" href="static/css/studio.css">
+  <!-- Chart.js for SOC Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <!-- ── TOP GLOBAL NAVIGATION ── -->
+  <header id="global-header">
+    <div class="nav-left">
+      <div class="brand-badge-wrap" onclick="switchNav('dashboard')">
+        <div class="brand-shield-icon">🛡️</div>
+        <div>
+          <div class="brand-title-text">SENTINEL <span class="cyan-accent">AI</span></div>
+          <div class="brand-subtitle-text">ENTERPRISE EMAIL THREAT SOC</div>
+        </div>
+      </div>
+
+      <nav class="top-nav-links">
+        <button class="nav-btn active" id="nav-btn-dashboard" onclick="switchNav('dashboard')">
+          <span>📊</span> Dashboard
+        </button>
+        <button class="nav-btn" id="nav-btn-analyze" onclick="switchNav('analyze')">
+          <span>🔍</span> Analyze Email
+        </button>
+        <button class="nav-btn" id="nav-btn-history" onclick="switchNav('history')">
+          <span>🗄️</span> Analysis History
+        </button>
+        <button class="nav-btn" id="nav-btn-intel" onclick="switchNav('intel')">
+          <span>🌐</span> Threat Intel
+        </button>
+        <button class="nav-btn" id="nav-btn-reports" onclick="switchNav('reports')">
+          <span>📑</span> Reports
+        </button>
+        <button class="nav-btn" id="nav-btn-settings" onclick="switchNav('settings')">
+          <span>⚙️</span> Settings
+        </button>
+      </nav>
+    </div>
+
+    <div class="nav-right">
+      <div class="status-pill system-online-pill">
+        <span class="pulse-emerald-dot"></span>
+        <span>SYSTEM ONLINE</span>
+      </div>
+      <div class="status-pill" id="live-scan-counter">
+        <span style="color:var(--text-dim);">Last Analysis:</span>
+        <strong id="header-last-scan">Just now</strong>
+      </div>
+      <div class="analyst-profile-chip">
+        <div class="analyst-avatar">SP</div>
+        <div>
+          <div style="font-size:0.8rem; font-weight:700;">Suresh P.</div>
+          <div style="font-size:0.65rem; color:var(--accent);">Lead SOC Threat Hunter</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── MAIN APPLICATION VIEWPORT ── -->
+  <main id="app-viewport">
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: EXECUTIVE SOC DASHBOARD                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-dashboard" class="soc-view active">
+      
+      <!-- Top Action Bar -->
+      <div class="view-header-bar">
+        <div>
+          <h2>Security Operations Center Overview</h2>
+          <p class="view-subtitle">Real-time enterprise email telemetry, threat attribution, and heuristic verification.</p>
+        </div>
+        <div>
+          <button class="btn btn-primary" onclick="switchNav('analyze')">
+            <span>⚡</span> Analyze Inbound Email →
+          </button>
+        </div>
+      </div>
+
+      <!-- Executive KPI Cards -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">EMAILS ANALYZED</span>
+            <span class="kpi-icon">📬</span>
+          </div>
+          <div class="kpi-value" id="kpi-total">12,488</div>
+          <div class="kpi-trend positive">
+            <span>↑ 14.2%</span> from last week
+          </div>
+          <div class="kpi-sparkbar"><div style="width: 82%;"></div></div>
+        </div>
+
+        <div class="kpi-card danger-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">PHISHING DETECTED</span>
+            <span class="kpi-icon">🎣</span>
+          </div>
+          <div class="kpi-value text-red" id="kpi-phishing">1,284</div>
+          <div class="kpi-trend danger">
+            <span>↑ 8.1%</span> credential attacks
+          </div>
+          <div class="kpi-sparkbar danger"><div style="width: 38%;"></div></div>
+        </div>
+
+        <div class="kpi-card warning-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">SPAM BLOCKED</span>
+            <span class="kpi-icon">🚫</span>
+          </div>
+          <div class="kpi-value text-orange" id="kpi-spam">3,841</div>
+          <div class="kpi-trend neutral">
+            <span>↓ 2.4%</span> bulk marketing
+          </div>
+          <div class="kpi-sparkbar warning"><div style="width: 54%;"></div></div>
+        </div>
+
+        <div class="kpi-card high-risk-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">HIGH RISK / MALICIOUS</span>
+            <span class="kpi-icon">☣️</span>
+          </div>
+          <div class="kpi-value text-purple" id="kpi-malicious">624</div>
+          <div class="kpi-trend danger">
+            <span>↑ 5.3%</span> macro & payload droppers
+          </div>
+          <div class="kpi-sparkbar purple"><div style="width: 26%;"></div></div>
+        </div>
+
+        <div class="kpi-card safe-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">SAFE & VERIFIED</span>
+            <span class="kpi-icon">🛡️</span>
+          </div>
+          <div class="kpi-value text-green" id="kpi-safe">6,739</div>
+          <div class="kpi-trend positive">
+            <span>↑ 11.7%</span> clean traffic
+          </div>
+          <div class="kpi-sparkbar safe"><div style="width: 76%;"></div></div>
+        </div>
+
+        <div class="kpi-card cyan-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">DETECTION ACCURACY</span>
+            <span class="kpi-icon">🎯</span>
+          </div>
+          <div class="kpi-value text-cyan" id="kpi-accuracy">96.8%</div>
+          <div class="kpi-trend positive">
+            <span>Multi-Vector Calibrated</span>
+          </div>
+          <div class="kpi-sparkbar cyan"><div style="width: 96.8%;"></div></div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-grid">
+        <div class="glass-panel chart-panel">
+          <div class="panel-header">
+            <div class="panel-title">Inbound Classification Distribution</div>
+            <span class="panel-tag">Current Month</span>
+          </div>
+          <div style="height: 230px; position: relative;">
+            <canvas id="chart-distribution"></canvas>
+          </div>
+        </div>
+
+        <div class="glass-panel chart-panel">
+          <div class="panel-header">
+            <div class="panel-title">Threat Vector Attribution</div>
+            <span class="panel-tag">Leading Signals</span>
+          </div>
+          <div style="height: 230px; position: relative;">
+            <canvas id="chart-vectors"></canvas>
+          </div>
+        </div>
+
+        <div class="glass-panel chart-panel">
+          <div class="panel-header">
+            <div class="panel-title">7-Day Threat Velocity Trend</div>
+            <span class="panel-tag">Incident Volume</span>
+          </div>
+          <div style="height: 230px; position: relative;">
+            <canvas id="chart-trend"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent SOC Investigations Table -->
+      <div class="glass-panel" style="margin-top:20px;">
+        <div class="panel-header">
+          <div class="panel-title">Recent Threat Investigations</div>
+          <button class="btn btn-secondary btn-sm" onclick="loadCaseHistory()">Refresh Log</button>
+        </div>
+        <div class="table-responsive">
+          <table class="soc-table">
+            <thead>
+              <tr>
+                <th>Case ID</th>
+                <th>Subject / Subject Line</th>
+                <th>Sender Identity</th>
+                <th>Return-Path</th>
+                <th>Verdict</th>
+                <th>Risk Score</th>
+                <th>Analyzed At</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-cases-tbody">
+              <tr>
+                <td colspan="8" class="text-center text-muted" style="padding:25px;">Loading recent investigations...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: ANALYZE EMAIL (UPLOAD & HERO INVESTIGATION PIPELINE)        -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-analyze" class="soc-view">
+      
+      <!-- Upload Center Area -->
+      <div id="upload-center-container" class="upload-center-wrap">
+        <div class="glass-panel upload-panel">
+          <div class="upload-hero">
+            <div class="upload-badge-icon">📥</div>
+            <h1>Analyze an Inbound Email</h1>
+            <p class="upload-subtitle">Upload an email file to perform a complete, multi-vector security investigation across headers, cryptographic authentication, origin routing, URLs, and attachments.</p>
+          </div>
+
+          <!-- Drag and Drop Dropzone -->
+          <div id="email-dropzone" class="dropzone" onclick="document.getElementById('file-input-elem').click()">
+            <input type="file" id="file-input-elem" style="display:none;" accept=".eml,.msg,.txt,.html" onchange="handleFileSelect(event)">
+            <div class="dropzone-icon">☁️</div>
+            <div class="dropzone-title">Drag & Drop email file here or <span class="cyan-link">browse files</span></div>
+            <div class="dropzone-sub">Supported formats: <strong>.EML</strong>, <strong>.MSG</strong>, <strong>.TXT</strong>, <strong>.HTML</strong> (Max: 25 MB)</div>
+            <div class="dropzone-tags">
+              <span class="drop-tag">RFC 5322 Compliant</span>
+              <span class="drop-tag">Zero Cloud Relay Leak</span>
+              <span class="drop-tag">Isolated Sandboxing</span>
+            </div>
+          </div>
+
+          <!-- Paste Raw Content Toggle -->
+          <div style="margin-top:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="toggleRawInput()">
+                <span>📝</span> Toggle Raw Header / Body Paste
+              </button>
+              <span style="font-size:0.8rem; color:var(--text-dim);">Or test instantly using executive demo suite below</span>
+            </div>
+            
+            <div id="raw-input-wrapper" style="display:none; margin-top:10px;">
+              <textarea id="raw-email-input" class="code-font" style="width:100%; height:160px; resize:vertical; padding:12px; font-size:0.85rem;" placeholder="Paste raw RFC 5322 email headers and body here..."></textarea>
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('raw-email-input').value = ''">Clear</button>
+                <button class="btn btn-primary" onclick="analyzeRawInput()">Analyze Pasted Content</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Executive Demo Suite -->
+          <div class="executive-demo-banner">
+            <div class="demo-title-wrap">
+              <span class="demo-shield-badge">CEO DEMO SUITE</span>
+              <span>Test the multi-vector detection engine instantly with realistic scenario datasets:</span>
+            </div>
+            <div class="demo-buttons-row">
+              <button class="btn btn-demo-phishing" onclick="triggerDemoAnalysis('phishing')">
+                <span>🔴</span> Analyze Phishing Email (PayPal Lookalike / IP URL)
+              </button>
+              <button class="btn btn-demo-suspicious" onclick="triggerDemoAnalysis('suspicious')">
+                <span>🟡</span> Analyze Suspicious Email (Executive BEC Wire Transfer)
+              </button>
+              <button class="btn btn-demo-spam" onclick="triggerDemoAnalysis('spam')">
+                <span>🟠</span> Analyze Spam Email (B2B Bulk Marketing Blast)
+              </button>
+              <button class="btn btn-demo-safe" onclick="triggerDemoAnalysis('safe')">
+                <span>🟢</span> Analyze Safe Email (Corporate Infrastructure Health)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── THE HERO FEATURE: VISUAL ANALYSIS PIPELINE (ANIMATED STAGES) ── -->
+      <div id="pipeline-container" class="pipeline-wrap" style="display:none;">
+        <div class="glass-panel pipeline-panel">
+          <div class="pipeline-header">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="pipeline-live-indicator"></span>
+                <h3 style="margin:0;">Multi-Vector Investigation Pipeline Active</h3>
+              </div>
+              <p class="view-subtitle" style="margin-top:4px;">Live automated forensic pipeline analyzing cryptographic headers, server hops, and payload indicators.</p>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.75rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px;">ANALYSIS TIMER</div>
+              <div id="pipeline-timer" class="pipeline-timer-display">00:00.000</div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="pipeline-progressbar-bg">
+            <div id="pipeline-progressbar-fill" class="pipeline-progressbar-fill"></div>
+          </div>
+
+          <!-- 17-Stage Visual Nodes Grid -->
+          <div class="pipeline-stages-grid" id="pipeline-stages-container">
+            <!-- Dynamically populated 17 stages -->
+          </div>
+
+          <!-- Real-Time Discovered Findings Ticker -->
+          <div class="pipeline-ticker-wrap">
+            <div class="ticker-header">
+              <span>REAL-TIME DISCOVERED THREAT SIGNALS</span>
+              <span id="ticker-status-label" style="font-size:0.75rem; color:var(--accent);">EVALUATING...</span>
+            </div>
+            <div id="pipeline-ticker-log" class="ticker-log-box">
+              <div class="ticker-entry"><span class="tick-time">[00:00.010]</span> Email payload received and verified for RFC compliance.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMAIL ANALYSIS INVESTIGATION WORKSPACE (3-COLUMN LAYOUT) ── -->
+      <div id="workspace-container" class="workspace-wrap" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div>
+            <span class="workspace-case-badge" id="ws-case-badge">CASE #INV-0000</span>
+            <h2 id="ws-email-subject" style="display:inline-block; vertical-align:middle; margin:0 0 0 10px; font-size:1.3rem;">Investigation Results</h2>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="exportIncidentReport('txt')">💾 Export Report (.txt)</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportIncidentReport('json')">📄 Export JSON</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Print PDF</button>
+            <button class="btn btn-primary btn-sm" onclick="resetToUpload()">+ New Analysis</button>
+          </div>
+        </div>
+
+        <div class="workspace-grid">
+          
+          <!-- LEFT COLUMN: EMAIL METADATA -->
+          <div class="ws-col-left">
+            <div class="glass-panel meta-panel">
+              <div class="panel-header">
+                <div class="panel-title">Email Identification</div>
+                <span class="panel-tag">RFC 5322</span>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">FROM (DISPLAY + ADDRESS)</div>
+                <div class="meta-value font-mono" id="meta-from">--</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">RETURN-PATH (ENVELOPE FROM)</div>
+                <div class="meta-value font-mono" id="meta-return-path">--</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">REPLY-TO ADDRESS</div>
+                <div class="meta-value font-mono" id="meta-reply-to">--</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">TO (RECIPIENT)</div>
+                <div class="meta-value font-mono" id="meta-to">--</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">CC</div>
+                <div class="meta-value font-mono" id="meta-cc">None</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">DATE & TIME</div>
+                <div class="meta-value font-mono" id="meta-date">--</div>
+              </div>
+
+              <div class="meta-field-group">
+                <div class="meta-label">MESSAGE-ID</div>
+                <div class="meta-value font-mono" id="meta-message-id">--</div>
+              </div>
+
+              <div class="meta-metrics-row">
+                <div class="meta-metric-chip">
+                  <span class="m-val" id="meta-urls-count">0</span>
+                  <span class="m-lbl">URLs Found</span>
+                </div>
+                <div class="meta-metric-chip">
+                  <span class="m-val" id="meta-attachments-count">0</span>
+                  <span class="m-lbl">Attachments</span>
+                </div>
+                <div class="meta-metric-chip">
+                  <span class="m-val" id="meta-hops-count">0</span>
+                  <span class="m-lbl">Relay Hops</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Threat Evidence Graph (Interactive Node Visual) -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Threat Evidence Graph</div>
+                <span class="panel-tag">Entity Correlator</span>
+              </div>
+              <div class="evidence-graph-container" id="evidence-graph-viz">
+                <!-- Dynamic SVG/Node Graph -->
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER COLUMN: FORENSIC INVESTIGATION DEEP DIVE -->
+          <div class="ws-col-center">
+            
+            <!-- 1. Email Journey Map (Hop-by-Hop Route) -->
+            <div class="glass-panel">
+              <div class="panel-header">
+                <div class="panel-title">Email Journey Map & Route Visualization</div>
+                <span class="panel-tag">Multi-MTA Relay Trace</span>
+              </div>
+              <div class="route-hops-container" id="route-hops-list">
+                <!-- Populated dynamically with server cards & connecting lines -->
+              </div>
+            </div>
+
+            <!-- 2. Cryptographic Authentication Security Panel -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Cryptographic Authentication Matrix</div>
+                <span class="panel-tag">Independent Verification</span>
+              </div>
+              <div class="auth-matrix-grid">
+                <div class="auth-card" id="auth-card-spf">
+                  <div class="auth-card-header">
+                    <span>SPF (Sender Policy Framework)</span>
+                    <span class="auth-badge badge-neutral" id="auth-spf-badge">CHECKING...</span>
+                  </div>
+                  <div class="auth-desc" id="auth-spf-desc">Validates if sender IP address is authorized to send for envelope domain.</div>
+                </div>
+
+                <div class="auth-card" id="auth-card-dkim">
+                  <div class="auth-card-header">
+                    <span>DKIM (DomainKeys Identified Mail)</span>
+                    <span class="auth-badge badge-neutral" id="auth-dkim-badge">CHECKING...</span>
+                  </div>
+                  <div class="auth-desc" id="auth-dkim-desc">Cryptographic public key signature verification of message integrity.</div>
+                </div>
+
+                <div class="auth-card" id="auth-card-dmarc">
+                  <div class="auth-card-header">
+                    <span>DMARC (Domain-based Auth & Policy)</span>
+                    <span class="auth-badge badge-neutral" id="auth-dmarc-badge">CHECKING...</span>
+                  </div>
+                  <div class="auth-desc" id="auth-dmarc-desc">Enforces alignment policy (none, quarantine, reject) between From and envelope.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Sender Reputation & Lookalike Intelligence -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Sender Identity & Reputation Intelligence</div>
+                <span class="panel-tag">Anti-Spoofing</span>
+              </div>
+              <div id="sender-intel-box" class="sender-intel-content">
+                <!-- Populated with domain age, homoglyphs, alignment checks -->
+              </div>
+            </div>
+
+            <!-- 4. URL Inspection Table -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Extracted URL Inspection & Safety Analysis</div>
+                <span class="panel-tag" id="url-count-tag">0 URLs</span>
+              </div>
+              <div class="table-responsive">
+                <table class="soc-table">
+                  <thead>
+                    <tr>
+                      <th>Target URL</th>
+                      <th>Resolved Domain</th>
+                      <th>Protocol</th>
+                      <th>Open Redirect</th>
+                      <th>Risk Level</th>
+                      <th>Indicators</th>
+                    </tr>
+                  </thead>
+                  <tbody id="urls-table-tbody">
+                    <tr><td colspan="6" class="text-center text-muted">No links detected in message body.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 5. Social Engineering & Coercion Gauges -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Social Engineering & Linguistic Coercion Signals</div>
+                <span class="panel-tag">Psychological Trigger Analysis</span>
+              </div>
+              <div class="social-eng-grid" id="social-eng-container">
+                <!-- Urgency, Credential Theft, Impersonation, Financial Fraud meters -->
+              </div>
+            </div>
+
+            <!-- 6. Attachment Forensics Sandbox -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Attachment Forensics & Payload Sandbox</div>
+                <span class="panel-tag">Static PE & OLE Inspection</span>
+              </div>
+              <div id="attachments-container" class="attachments-list-wrap">
+                <!-- Populated with attachment findings -->
+              </div>
+            </div>
+
+            <!-- 7. Audit Timeline -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Investigation Execution Audit Timeline</div>
+                <span class="panel-tag">SIEM Telemetry</span>
+              </div>
+              <div class="timeline-container" id="timeline-events-list">
+                <!-- Audit events -->
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN: RISK SCORING, VERDICT & PLAYBOOK -->
+          <div class="ws-col-right">
+            
+            <!-- Final Verdict Card -->
+            <div class="glass-panel verdict-card" id="verdict-banner-card">
+              <div style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-dim); margin-bottom:4px;">FINAL CLASSIFICATION VERDICT</div>
+              <div class="verdict-title" id="ws-verdict-title">EVALUATING...</div>
+              <div class="verdict-desc" id="ws-verdict-desc">Analyzing signals...</div>
+              
+              <!-- Risk Score Gauge -->
+              <div class="risk-gauge-wrap">
+                <div class="risk-gauge-circle">
+                  <span class="risk-gauge-number" id="ws-risk-number">0</span>
+                  <span class="risk-gauge-sub">/ 100</span>
+                </div>
+                <div style="margin-top:8px;">
+                  <div class="risk-level-badge" id="ws-risk-level-badge">CALCULATING</div>
+                  <div style="font-size:0.8rem; color:var(--text-dim); margin-top:4px;" id="ws-confidence-label">Confidence: 95%</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Explainable Risk Score Breakdown -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Risk Score Breakdown</div>
+                <span class="panel-tag">Auditable Weights</span>
+              </div>
+              <div class="risk-breakdown-table" id="ws-risk-breakdown-list">
+                <!-- Point contributions -->
+              </div>
+            </div>
+
+            <!-- "Why Was This Classified This Way?" Section -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title">Executive Threat Summary</div>
+                <span class="panel-tag">Explainable AI</span>
+              </div>
+              <p class="plain-english-box" id="ws-plain-explanation">--</p>
+              
+              <div style="margin-top:14px;">
+                <div style="font-size:0.8rem; font-weight:700; color:var(--accent); margin-bottom:8px;">Key Trigger Evidence:</div>
+                <div id="ws-key-evidence-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+              </div>
+            </div>
+
+            <!-- SOC Incident Response Actions Playbook -->
+            <div class="glass-panel" style="margin-top:16px;">
+              <div class="panel-header">
+                <div class="panel-title text-red">Recommended SOC Incident Playbook</div>
+                <span class="panel-tag" style="background:rgba(255,23,68,0.15); color:#ff1744;">Action Required</span>
+              </div>
+              <ul class="soc-playbook-list" id="ws-soc-actions-list">
+                <!-- Actions -->
+              </ul>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: ANALYSIS HISTORY                                            -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-history" class="soc-view">
+      <div class="view-header-bar">
+        <div>
+          <h2>Threat Investigation History</h2>
+          <p class="view-subtitle">Searchable, persistent audit log of all emails analyzed by Sentinel AI.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="history-search-input" placeholder="Search by subject, sender, or domain..." style="width:280px; padding:8px 14px; font-size:0.85rem;" oninput="filterHistoryTable()">
+          <select id="history-filter-select" style="padding:8px 14px; font-size:0.85rem;" onchange="filterHistoryTable()">
+            <option value="all">All Classifications</option>
+            <option value="phishing">Phishing</option>
+            <option value="malicious">High Risk / Malicious</option>
+            <option value="suspicious">Suspicious</option>
+            <option value="spam">Spam</option>
+            <option value="safe">Safe</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="glass-panel" style="margin-top:20px;">
+        <div class="table-responsive">
+          <table class="soc-table">
+            <thead>
+              <tr>
+                <th>Case ID</th>
+                <th>Subject Line</th>
+                <th>Sender</th>
+                <th>Return-Path</th>
+                <th>Classification Verdict</th>
+                <th>Risk Score</th>
+                <th>Timestamp</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-tbody">
+              <tr>
+                <td colspan="8" class="text-center text-muted" style="padding:30px;">Loading historical investigation logs...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 4: THREAT INTELLIGENCE FEED                                   -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-intel" class="soc-view">
+      <div class="view-header-bar">
+        <div>
+          <h2>Threat Intelligence & Detection Rule Feeds</h2>
+          <p class="view-subtitle">Active databases of high-abuse TLDs, Unicode homoglyphs, and protected brand assets.</p>
+        </div>
+      </div>
+
+      <div class="charts-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:20px;">
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">Known High-Abuse Phishing TLDs</div>
+            <span class="panel-tag">Heuristic Level: High</span>
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:12px;">Domains ending with these suffixes receive automated risk score penalties:</div>
+          <div class="intel-badge-cloud">
+            <span class="intel-tag danger">.xyz</span>
+            <span class="intel-tag danger">.top</span>
+            <span class="intel-tag danger">.buzz</span>
+            <span class="intel-tag danger">.club</span>
+            <span class="intel-tag danger">.icu</span>
+            <span class="intel-tag danger">.work</span>
+            <span class="intel-tag danger">.cfd</span>
+            <span class="intel-tag danger">.monster</span>
+            <span class="intel-tag danger">.sbs</span>
+            <span class="intel-tag danger">.cam</span>
+            <span class="intel-tag danger">.click</span>
+            <span class="intel-tag danger">.link</span>
+            <span class="intel-tag danger">.zip</span>
+            <span class="intel-tag danger">.mov</span>
+            <span class="intel-tag danger">.tk</span>
+          </div>
+        </div>
+
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">Unicode TR39 Confusable Homoglyphs</div>
+            <span class="panel-tag">Fuzzy Levenshtein</span>
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:12px;">Automatic normalization catches lookalike characters across alphabets:</div>
+          <div style="font-family:var(--font-mono); font-size:0.8rem; line-height:1.7; color:var(--text);">
+            <div>• Cyrillic 'а' (U+0430) ➔ Latin 'a'</div>
+            <div>• Cyrillic 'о' (U+043E) ➔ Latin 'o'</div>
+            <div>• Cyrillic 'р' (U+0440) ➔ Latin 'p'</div>
+            <div>• Turkish 'ı' (U+0131) ➔ Latin 'i'</div>
+            <div>• Numeric '0' / '1' ➔ Lookalike 'o' / 'l'</div>
+            <div>• PaypaI (capital i) ➔ PayPal lookalike</div>
+          </div>
+        </div>
+
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">Protected Enterprise Brands (Anti-Spoofing)</div>
+            <span class="panel-tag">VIP Shield</span>
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-dim); margin-bottom:12px;">Zero-tolerance display name and subject impersonation protection:</div>
+          <div class="intel-badge-cloud">
+            <span class="intel-tag cyan">Microsoft 365</span>
+            <span class="intel-tag cyan">PayPal</span>
+            <span class="intel-tag cyan">Google Workspace</span>
+            <span class="intel-tag cyan">Apple iCloud</span>
+            <span class="intel-tag cyan">Amazon AWS</span>
+            <span class="intel-tag cyan">DocuSign</span>
+            <span class="intel-tag cyan">Bank of America</span>
+            <span class="intel-tag cyan">Chase</span>
+            <span class="intel-tag cyan">Wells Fargo</span>
+            <span class="intel-tag cyan">Netflix</span>
+            <span class="intel-tag cyan">Internal Payroll / HR</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 5: COMPLIANCE REPORTS                                          -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-reports" class="soc-view">
+      <div class="view-header-bar">
+        <div>
+          <h2>SOC 2 & ISO 27001 Compliance Audit Reports</h2>
+          <p class="view-subtitle">Regulatory-grade reporting and audit trails for corporate cybersecurity governance.</p>
+        </div>
+        <button class="btn btn-primary" onclick="window.print()">🖨️ Export Audit Report (PDF)</button>
+      </div>
+
+      <div class="glass-panel" style="margin-top:20px; padding:30px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid var(--panel-border); padding-bottom:20px;">
+          <div>
+            <h1 style="font-size:1.8rem; margin:0;">SENTINEL AI — INBOUND EMAIL COMPLIANCE AUDIT</h1>
+            <p style="color:var(--text-dim); margin-top:6px;">Governance, Risk, and Compliance (GRC) Automated Telemetry Summary</p>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.8rem; color:var(--text-dim);">AUDIT PERIOD:</div>
+            <div style="font-weight:700; font-family:var(--font-mono);">SEPTEMBER 2026</div>
+          </div>
+        </div>
+
+        <div class="charts-grid" style="grid-template-columns:repeat(3, 1fr); margin-top:25px;">
+          <div style="padding:16px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid var(--panel-border);">
+            <div style="font-size:0.8rem; color:var(--text-dim);">NIST SP 800-177 CONTROLS</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--green); margin-top:4px;">100% COMPLIANT</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Trustworthy Email (SPF/DKIM/DMARC)</div>
+          </div>
+          <div style="padding:16px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid var(--panel-border);">
+            <div style="font-size:0.8rem; color:var(--text-dim);">MALICIOUS QUARANTINE RATE</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--accent); margin-top:4px;">99.4% MITIGATED</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Zero high-risk delivery exceptions</div>
+          </div>
+          <div style="padding:16px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid var(--panel-border);">
+            <div style="font-size:0.8rem; color:var(--text-dim);">FALSE POSITIVE RATIO</div>
+            <div style="font-size:1.4rem; font-weight:800; color:var(--yellow); margin-top:4px;">&lt; 0.08%</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">Verified against whitelisted senders</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB 6: SETTINGS                                                    -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-settings" class="soc-view">
+      <div class="view-header-bar">
+        <div>
+          <h2>Engine Configuration & Heuristic Thresholds</h2>
+          <p class="view-subtitle">Tune forensic scoring weights, DNS resolvers, and quarantine policies.</p>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+      </div>
+
+      <div class="glass-panel" style="margin-top:20px; max-width:800px;">
+        <div class="panel-header">
+          <div class="panel-title">Threat Scoring & Classification Thresholds</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:20px; padding:15px 0;">
+          <div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <label style="font-weight:600; font-size:0.9rem;">Malicious / Critical Phishing Threshold (Score: 75–100)</label>
+              <span class="font-mono text-red" id="thresh-malicious-val">75 pts</span>
+            </div>
+            <input type="range" min="60" max="90" value="75" style="width:100%;" oninput="document.getElementById('thresh-malicious-val').textContent = this.value + ' pts'">
+          </div>
+
+          <div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <label style="font-weight:600; font-size:0.9rem;">Suspicious / Manual Review Threshold (Score: 40–74)</label>
+              <span class="font-mono text-orange" id="thresh-suspicious-val">40 pts</span>
+            </div>
+            <input type="range" min="30" max="60" value="40" style="width:100%;" oninput="document.getElementById('thresh-suspicious-val').textContent = this.value + ' pts'">
+          </div>
+
+          <div style="border-top:1px solid var(--panel-border); padding-top:16px;">
+            <label style="font-weight:600; font-size:0.9rem; display:block; margin-bottom:8px;">Live DNS & WHOIS Resolvers</label>
+            <div style="display:flex; gap:20px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" checked id="chk-live-dns"> Perform Active Outbound DNS Re-verification
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer;">
+                <input type="checkbox" checked id="chk-domain-age"> Enable WHOIS Domain Registration Age Inspection
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main Controller Scripts -->
+  <script src="static/js/app.js"></script>
+  <script src="static/js/forensics.js"></script>
+</body>
+</html>
