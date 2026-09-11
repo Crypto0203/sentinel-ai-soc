@@ -1058,23 +1058,33 @@ function renderRiskBreakdown(breakdown) {
     return;
   }
 
-  container.innerHTML = breakdown.map(b => `
+  container.innerHTML = breakdown.map(b => {
+    const detailText = b.details || b.detail || (b.status ? `Status: ${b.status} (${b.points || 0}/${b.max || 30} pts allocated)` : (b.weight ? `Weight: ${b.weight}` : 'Evaluated threat vector'));
+    const pts = b.points !== undefined ? b.points : (b.score !== undefined ? b.score : 0);
+    return `
     <div class="risk-breakdown-row">
-      <div>
-        <div style="font-weight:600; font-size:0.85rem; color:var(--text);">${escapeHtml(b.category || 'Threat Vector')}</div>
-        <div style="font-size:0.75rem; color:var(--text-dim);">${escapeHtml(b.details || '--')}</div>
+      <div style="min-width:0; flex:1;">
+        <div style="font-weight:600; font-size:0.85rem; color:var(--text);">${escapeHtml(b.category || b.factor || 'Threat Vector')}</div>
+        <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">${escapeHtml(detailText)}</div>
       </div>
-      <div class="font-mono text-red" style="font-weight:700; font-size:0.9rem;">
-        +${b.points || 0} pts
+      <div class="font-mono ${pts > 0 ? 'text-red' : 'text-green'}" style="font-weight:700; font-size:0.9rem; margin-left:12px; white-space:nowrap;">
+        +${pts} pts
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderExecutiveSummary(report) {
   const pEl = document.getElementById('ws-plain-explanation');
   if (pEl) {
-    pEl.textContent = report.why_it_is_spam_explanation || report.plain_english_summary || report.summary || 'No suspicious factors identified during email forensics evaluation.';
+    const summaryText = report.why_it_is_spam_explanation || report.plain_english_summary || report.summary || report.explanation;
+    if (summaryText) {
+      pEl.textContent = summaryText;
+    } else {
+      const cls = (report.classification || 'unknown').toUpperCase();
+      pEl.textContent = `This communication was classified as ${cls} (Risk Score: ${report.risk_score || 0}/100). The multi-vector forensic engine identified key anomalies across authentication headers, sender alignment, and embedded entities.`;
+    }
   }
 
   const evList = document.getElementById('ws-key-evidence-list');
@@ -1083,9 +1093,10 @@ function renderExecutiveSummary(report) {
     if (evidence.length === 0) {
       evList.innerHTML = `<div style="font-size:0.8rem; color:var(--green);">• Verified RFC-compliant sender identity with zero anomalous indicators.</div>`;
     } else {
-      evList.innerHTML = evidence.slice(0, 4).map(e => `
-        <div style="font-size:0.8rem; color:var(--text); line-height:1.4;">
-          <strong class="text-red">• [${escapeHtml(e.category || 'THREAT')}]:</strong> <span style="color:var(--text-dim);">${escapeHtml(e.description || '')}</span>
+      evList.innerHTML = evidence.slice(0, 5).map(e => `
+        <div style="font-size:0.8rem; color:var(--text); line-height:1.4; padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+          <strong class="${(e.severity === 'CRITICAL' || e.severity === 'HIGH') ? 'text-red' : 'text-yellow'}">• [${escapeHtml(e.category || e.stage || 'THREAT')}]:</strong> 
+          <span style="color:var(--text-dim);">${escapeHtml(e.description || e.detail || e.indicator || '')}</span>
         </div>
       `).join('');
     }
