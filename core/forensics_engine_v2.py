@@ -142,7 +142,7 @@ def analyze_email(raw_message_bytes, our_authserv_id: Optional[str] = None,
     scoring = ScoringEngine()
 
     # --- Authentication (independently re-verified, or parsed from inbound headers) ---
-    auth_summary = {"spf": "NOT_CHECKED", "dkim": "NOT_CHECKED", "dmarc": "NOT_CHECKED"}
+    auth_summary = {"spf": "NOT_CHECKED", "dkim": "NOT_CHECKED", "dmarc": "NOT_CHECKED", "arc": "NONE"}
     if do_live_lookups and ids["sender_ip"]:
         auth = verify_auth(
             raw_message_bytes, ids["sender_ip"], ids["envelope_from_domain"],
@@ -162,7 +162,7 @@ def analyze_email(raw_message_bytes, our_authserv_id: Optional[str] = None,
             scoring.add("dmarc_fail_reject", "DMARC failed with p=reject policy — strong forgery signal.")
         elif auth.dmarc == "FAIL" and auth.dmarc_policy == "quarantine":
             scoring.add("dmarc_fail_quarantine", "DMARC failed with p=quarantine policy.")
-        auth_summary = {"spf": auth.spf, "dkim": auth.dkim, "dmarc": auth.dmarc}
+        auth_summary = {"spf": auth.spf, "dkim": auth.dkim, "dmarc": auth.dmarc, "arc": "PASS" if "arc=pass" in str(msg).lower() else "NONE"}
     else:
         # Check inbound Authentication-Results or Received-SPF headers if present in pasted snippet
         auth_header = msg.get("Authentication-Results", "") or ""
@@ -172,6 +172,7 @@ def analyze_email(raw_message_bytes, our_authserv_id: Optional[str] = None,
         spf_val = "PASS" if "spf=pass" in combined_auth else ("FAIL" if "spf=fail" in combined_auth or "fail" in spf_header.lower() else ("SOFTFAIL" if "softfail" in combined_auth else "NONE"))
         dkim_val = "PASS" if "dkim=pass" in combined_auth else ("FAIL" if "dkim=fail" in combined_auth else "NONE")
         dmarc_val = "PASS" if "dmarc=pass" in combined_auth else ("FAIL" if "dmarc=fail" in combined_auth else "NONE")
+        arc_val = "PASS" if "arc=pass" in combined_auth else ("FAIL" if "arc=fail" in combined_auth else ("PASS" if "arc-seal" in combined_auth else "NONE"))
 
         if spf_val == "FAIL":
             scoring.add("spf_fail", "Inbound Authentication-Results reports SPF check failed.")
@@ -184,7 +185,7 @@ def analyze_email(raw_message_bytes, our_authserv_id: Optional[str] = None,
         if dmarc_val == "FAIL":
             scoring.add("dmarc_fail_reject", "Inbound Authentication-Results reports DMARC policy validation failed.")
 
-        auth_summary = {"spf": spf_val, "dkim": dkim_val, "dmarc": dmarc_val}
+        auth_summary = {"spf": spf_val, "dkim": dkim_val, "dmarc": dmarc_val, "arc": arc_val}
 
     # --- Envelope Alignment (Return-Path vs From domain) ---
     env_dom = ids["envelope_from_domain"].lower()

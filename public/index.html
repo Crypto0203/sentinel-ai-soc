@@ -467,6 +467,14 @@
                   </div>
                   <div class="auth-desc" id="auth-dmarc-desc">Enforces alignment policy (none, quarantine, reject) between From and envelope.</div>
                 </div>
+
+                <div class="auth-card" id="auth-card-arc">
+                  <div class="auth-card-header">
+                    <span>ARC (Authenticated Received Chain)</span>
+                    <span class="auth-badge badge-neutral" id="auth-arc-badge">CHECKING...</span>
+                  </div>
+                  <div class="auth-desc" id="auth-arc-desc">Validates cryptographic authentication chain across intermediate mail relays.</div>
+                </div>
               </div>
             </div>
 
@@ -596,6 +604,38 @@
               <ul class="soc-playbook-list" id="ws-soc-actions-list">
                 <!-- Actions -->
               </ul>
+            </div>
+
+            <!-- SOC Ticket Response Assistant (Jira / ServiceNow / Zendesk) -->
+            <div class="glass-panel" style="margin-top:16px; border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.95) 100%);">
+              <div class="panel-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:1.25rem;">🎫</span>
+                  <div>
+                    <div class="panel-title" style="color:var(--cyan); font-size:0.95rem; font-weight:700;">SOC Ticket Response Assistant</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">One-click canned response for Jira, ServiceNow & Zendesk</div>
+                  </div>
+                </div>
+                <span class="panel-tag" style="background:rgba(0,240,255,0.15); color:var(--cyan);">TICKET READY</span>
+              </div>
+              
+              <div style="padding-top: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:0.75rem; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:0.5px;">Canned Reply to Employee:</span>
+                  <span id="ticket-verdict-tag" class="auth-badge badge-warning" style="font-size:0.7rem;">CALCULATING</span>
+                </div>
+                
+                <textarea id="ws-ticket-response-text" rows="11" readonly style="width:100%; font-family:var(--font-mono); font-size:0.78rem; line-height:1.45; background:rgba(2,6,23,0.8); border:1px solid rgba(255,255,255,0.12); border-radius:8px; color:#e2e8f0; padding:10px 12px; resize:vertical;" placeholder="Canned response generating..."></textarea>
+
+                <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                  <button class="btn btn-primary btn-sm" onclick="copyTicketResponse()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <span>📋</span> Copy Ticket Reply
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="copyIocs()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <span>🛡️</span> Copy IOCs (Blocklist)
+                  </button>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -826,7 +866,6 @@
 
   <!-- Main Controller Scripts -->
   <script src="static/js/app.js"></script>
-  <script src="static/js/demo_data.js"></script>
   <script src="static/js/forensics.js"></script>
 </body>
 </html>
