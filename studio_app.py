@@ -104,7 +104,7 @@ def forensics_analyze():
     risk_score = report.get("risk_score")
 
     case_id = save_forensics_case(title, sender, return_path, verdict, risk_score, report)
-    report["case_id"] = case_id
+    report["case_id"] = str(case_id) if case_id else "0001"
     return jsonify(report)
 
 @app.route("/api/forensics/demo/<demo_type>", methods=["GET"])

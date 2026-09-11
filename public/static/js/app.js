@@ -445,13 +445,18 @@ function renderCaseTableRow(c) {
 
 async function reopenInvestigation(caseId) {
   try {
-    showToast(`Loading case #${caseId.substring(0, 8)}...`);
-    const res = await fetch(`${API_BASE}/api/forensics/case/${caseId}`);
+    const cleanId = String(caseId);
+    showToast(`Loading case #${cleanId.substring(0, 8)}...`);
+    const res = await fetch(`${API_BASE}/api/forensics/case/${cleanId}`);
     if (!res.ok) {
       showToast('Could not load case data', 'danger');
       return;
     }
-    const report = await res.json();
+    const data = await res.json();
+    const report = data.report_json || data;
+    if (!report.case_id && data.id) {
+      report.case_id = String(data.id);
+    }
     switchNav('analyze');
     
     // Switch to workspace directly
@@ -464,9 +469,11 @@ async function reopenInvestigation(caseId) {
     }
     showToast('Investigation workspace loaded!', 'success');
   } catch (e) {
+    console.error('Failed to open case:', e);
     showToast('Failed to open case', 'danger');
   }
 }
+
 
 function saveSettings() {
   showToast('SOC Engine thresholds & DNS rules saved successfully!', 'success');
