@@ -153,6 +153,14 @@ def forensics_case_detail(case_id):
         return jsonify({"error": "Case not found"}), 404
     return jsonify(case)
 
+# ── DUAL MOUNT ALIASES FOR VERCEL SERVERLESS SCRIPT_NAME ROUTING ──────
+app.add_url_rule("/forensics/analyze", view_func=forensics_analyze, methods=["POST"], endpoint="forensics_analyze_alias")
+app.add_url_rule("/forensics/demo/<demo_type>", view_func=forensics_demo, methods=["GET"], endpoint="forensics_demo_alias")
+app.add_url_rule("/forensics/stats", view_func=forensics_stats, methods=["GET"], endpoint="forensics_stats_alias")
+app.add_url_rule("/forensics/cases", view_func=forensics_cases, methods=["GET"], endpoint="forensics_cases_alias")
+app.add_url_rule("/forensics/case/<int:case_id>", view_func=forensics_case_detail, methods=["GET"], endpoint="forensics_case_detail_alias")
+app.add_url_rule("/heartbeat", view_func=lambda: ("OK", 200), methods=["GET"], endpoint="heartbeat_alias")
+
 # ── AUTOMATION FLOW APIS ───────────────────────────────────────────────
 
 @app.route("/api/flow/run", methods=["POST"])

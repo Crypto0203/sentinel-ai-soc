@@ -1,17 +1,10 @@
 {
+  "name": "sentinel-ai-soc",
   "version": 2,
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/static/(.*)",
-      "destination": "/static/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/api/index.py?__route__=$1"
     }
   ]
 }

@@ -1,0 +1,15 @@
+dist/
+build/
+*.exe
+*.spec
+*.db
+*.log
+scratch/
+.system_generated/
+test_studio.py
+test_cyber_forensics.py
+build_exe.bat
+RUN_STUDIO.bat
+suresh_pro_studio_2/
+client/
+.git/
