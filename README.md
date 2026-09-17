@@ -79,4 +79,4 @@ vercel --prod
 ---
 
 ## 📄 License
-Enterprise Commercial License. Developed by Suresh P. (Lead SOC Threat Hunter).
+Enterprise Commercial License. Developed by Suresh.M.

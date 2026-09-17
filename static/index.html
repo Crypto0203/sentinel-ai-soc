@@ -39,6 +39,9 @@
         <button class="nav-btn" id="nav-btn-intel" onclick="switchNav('intel')">
           <span>🌐</span> Threat Intel
         </button>
+        <button class="nav-btn" id="nav-btn-redirects" onclick="switchNav('redirects')">
+          <span>🔀</span> Redirection Tracer
+        </button>
         <button class="nav-btn" id="nav-btn-reports" onclick="switchNav('reports')">
           <span>📑</span> Reports
         </button>
@@ -58,10 +61,9 @@
         <strong id="header-last-scan">Just now</strong>
       </div>
       <div class="analyst-profile-chip">
-        <div class="analyst-avatar">SP</div>
+        <div class="analyst-avatar">SM</div>
         <div>
-          <div style="font-size:0.8rem; font-weight:700;">Suresh P.</div>
-          <div style="font-size:0.65rem; color:var(--accent);">Lead SOC Threat Hunter</div>
+          <div style="font-size:0.82rem; font-weight:700; color:#fff;">Suresh.M</div>
         </div>
       </div>
     </div>
@@ -467,6 +469,14 @@
                   </div>
                   <div class="auth-desc" id="auth-dmarc-desc">Enforces alignment policy (none, quarantine, reject) between From and envelope.</div>
                 </div>
+
+                <div class="auth-card" id="auth-card-arc">
+                  <div class="auth-card-header">
+                    <span>ARC (Authenticated Received Chain)</span>
+                    <span class="auth-badge badge-neutral" id="auth-arc-badge">CHECKING...</span>
+                  </div>
+                  <div class="auth-desc" id="auth-arc-desc">Validates cryptographic authentication chain across intermediate mail relays.</div>
+                </div>
               </div>
             </div>
 
@@ -494,13 +504,14 @@
                       <th>Target URL</th>
                       <th>Resolved Domain</th>
                       <th>Protocol</th>
-                      <th>Open Redirect</th>
+                      <th>Redirection Chain</th>
                       <th>Risk Level</th>
                       <th>Indicators</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody id="urls-table-tbody">
-                    <tr><td colspan="6" class="text-center text-muted">No links detected in message body.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">No links detected in message body.</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -596,6 +607,38 @@
               <ul class="soc-playbook-list" id="ws-soc-actions-list">
                 <!-- Actions -->
               </ul>
+            </div>
+
+            <!-- SOC Ticket Response Assistant (Jira / ServiceNow / Zendesk) -->
+            <div class="glass-panel" style="margin-top:16px; border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.95) 100%);">
+              <div class="panel-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:1.25rem;">🎫</span>
+                  <div>
+                    <div class="panel-title" style="color:var(--cyan); font-size:0.95rem; font-weight:700;">SOC Ticket Response Assistant</div>
+                    <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">One-click canned response for Jira, ServiceNow & Zendesk</div>
+                  </div>
+                </div>
+                <span class="panel-tag" style="background:rgba(0,240,255,0.15); color:var(--cyan);">TICKET READY</span>
+              </div>
+              
+              <div style="padding-top: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <span style="font-size:0.75rem; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:0.5px;">Canned Reply to Employee:</span>
+                  <span id="ticket-verdict-tag" class="auth-badge badge-warning" style="font-size:0.7rem;">CALCULATING</span>
+                </div>
+                
+                <textarea id="ws-ticket-response-text" rows="11" readonly style="width:100%; font-family:var(--font-mono); font-size:0.78rem; line-height:1.45; background:rgba(2,6,23,0.8); border:1px solid rgba(255,255,255,0.12); border-radius:8px; color:#e2e8f0; padding:10px 12px; resize:vertical;" placeholder="Canned response generating..."></textarea>
+
+                <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                  <button class="btn btn-primary btn-sm" onclick="copyTicketResponse()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <span>📋</span> Copy Ticket Reply
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="copyIocs()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <span>🛡️</span> Copy IOCs (Blocklist)
+                  </button>
+                </div>
+              </div>
             </div>
 
           </div>
@@ -728,6 +771,153 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- TAB: LINK REDIRECTION & MULTI-HOP HOP TRACER                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <section id="view-redirects" class="soc-view">
+      <!-- Header -->
+      <div class="view-header-bar">
+        <div>
+          <h2>Link Redirection & Multi-Hop Chain Tracer</h2>
+          <p class="view-subtitle">Inspect URL shorteners, open redirects, cloaking gates, and uncover final destination landing targets.</p>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-secondary" onclick="exportRedirectTrace()">
+            <span>📋</span> Export Redirection Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Hero & Interactive Search -->
+      <div class="redirect-tracer-hero glass-panel">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="font-size:0.8rem; font-weight:700; color:var(--cyan); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">MULTI-HOP URL TRACE ENGINE</div>
+            <h3 style="margin:0; font-size:1.25rem;">Trace Any Inbound Hyperlink Across All Intermediate Hops</h3>
+            <p style="color:var(--text-dim); font-size:0.85rem; margin:6px 0 0 0;">Evaluates HTTP 301/302/307/308 redirects, JavaScript meta-refresh, DNS rebinding, and IP-cloaking gates.</p>
+          </div>
+          <span class="panel-tag" style="background:rgba(0,240,255,0.15); color:var(--cyan);">SSRF PROTECTED</span>
+        </div>
+
+        <div class="redirect-input-bar">
+          <input type="text" id="redirect-trace-input" placeholder="Enter or paste any suspicious URL (e.g. https://bit.ly/3x9 or https://google.com/url?q=...)" value="https://bit.ly/4dX9qA1">
+          <button class="btn btn-primary" onclick="traceCustomUrl()">
+            <span>⚡</span> Trace Redirection Path
+          </button>
+        </div>
+
+        <!-- Quick Scenario Selection Chips -->
+        <div style="margin-top:16px;">
+          <div style="font-size:0.75rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Or Test Every Real-World Scenario:</div>
+          <div class="scenario-chips-wrap">
+            <div class="scenario-chip active" id="chip-scen-1" onclick="loadRedirectScenario(1)">
+              <span>⚡</span> 1. URL Shortener Masking (bit.ly ➔ Microsoft Phish)
+            </div>
+            <div class="scenario-chip" id="chip-scen-2" onclick="loadRedirectScenario(2)">
+              <span>🌐</span> 2. Open Redirect Abuse (Google ➔ Fake Banking)
+            </div>
+            <div class="scenario-chip" id="chip-scen-3" onclick="loadRedirectScenario(3)">
+              <span>🛡️</span> 3. Multi-Hop TDS / Cloaking Evasion (3 Hops)
+            </div>
+            <div class="scenario-chip" id="chip-scen-4" onclick="loadRedirectScenario(4)">
+              <span>📱</span> 4. QR / Data URI Redirect (Zero-Network)
+            </div>
+            <div class="scenario-chip" id="chip-scen-5" onclick="loadRedirectScenario(5)">
+              <span>🏢</span> 5. Proofpoint / SafeLinks Wrapper (Enterprise)
+            </div>
+            <div class="scenario-chip" id="chip-scen-6" onclick="loadRedirectScenario(6)">
+              <span>✅</span> 6. Clean Direct Link (Zero Redirects)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Redirection Telemetry KPI Row -->
+      <div class="kpi-grid" style="grid-template-columns: repeat(4, 1fr); margin-top:20px;">
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">TOTAL REDIRECT HOPS</span>
+            <span class="kpi-icon">🔀</span>
+          </div>
+          <div class="kpi-value text-cyan" id="metric-total-hops">2 Hops</div>
+          <div class="kpi-trend neutral" id="metric-hops-sub">3 Total Nodes Traversed</div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">PROTOCOL INTEGRITY</span>
+            <span class="kpi-icon">🔒</span>
+          </div>
+          <div class="kpi-value text-green" id="metric-ssl-status">HTTPS Throughout</div>
+          <div class="kpi-trend positive" id="metric-ssl-sub">No unencrypted SSL downgrades</div>
+        </div>
+
+        <div class="kpi-card danger-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">CLOAKING & TDS LIKELIHOOD</span>
+            <span class="kpi-icon">🎭</span>
+          </div>
+          <div class="kpi-value text-red" id="metric-cloaking-score">94% High</div>
+          <div class="kpi-trend danger" id="metric-cloaking-sub">Traffic Distribution Filter Active</div>
+        </div>
+
+        <div class="kpi-card danger-accent">
+          <div class="kpi-header">
+            <span class="kpi-label">FINAL LANDING VERDICT</span>
+            <span class="kpi-icon">🚨</span>
+          </div>
+          <div class="kpi-value text-red" id="metric-final-verdict">CRITICAL PHISH</div>
+          <div class="kpi-trend danger" id="metric-final-sub">Credential Harvester Detected</div>
+        </div>
+      </div>
+
+      <!-- Hop-by-Hop Visual Flow Canvas -->
+      <div class="glass-panel" style="margin-top:20px;">
+        <div class="panel-header">
+          <div class="panel-title">Hop-by-Hop Redirection Route & Server Telemetry</div>
+          <span class="panel-tag" id="scenario-badge-label">SCENARIO #1: URL SHORTENER MASKING</span>
+        </div>
+
+        <div id="redirect-hops-canvas" class="redirect-flow-canvas">
+          <!-- Dynamically populated with Hop Cards and Directional Connecting Arrows -->
+        </div>
+      </div>
+
+      <!-- Redirection Intelligence Rationale & Ticket Recommendation -->
+      <div class="charts-grid" style="grid-template-columns: 1fr 1fr; margin-top:20px;">
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">Redirection Chain Forensic Analysis</div>
+            <span class="panel-tag">Why Was This Flagged?</span>
+          </div>
+          <p id="redirect-why-summary" style="font-size:0.85rem; line-height:1.6; color:var(--text); margin-bottom:12px;">
+            --
+          </p>
+          <div id="redirect-evidence-list" style="display:flex; flex-direction:column; gap:6px;">
+            <!-- Key triggers -->
+          </div>
+        </div>
+
+        <div class="glass-panel">
+          <div class="panel-header">
+            <div class="panel-title">Recommended SOC Ticket Action</div>
+            <span class="panel-tag" style="background:rgba(255,23,68,0.15); color:var(--red);">ACTION REQUIRED</span>
+          </div>
+          <ul class="soc-playbook-list" id="redirect-action-list">
+            <!-- Playbook items -->
+          </ul>
+          <div style="margin-top:14px; display:flex; gap:10px;">
+            <button class="btn btn-primary btn-sm" onclick="copyRedirectTicketNote()" style="flex:1;">
+              <span>📋</span> Copy Redirection Ticket Note
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="copyRedirectIocs()" style="flex:1;">
+              <span>🛡️</span> Copy All Hop IPs & URLs
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- TAB 5: COMPLIANCE REPORTS                                          -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <section id="view-reports" class="soc-view">
@@ -821,12 +1011,38 @@
 
   </main>
 
-  <!-- Toast Notification Container -->
-  <div id="toast-container" class="toast-container"></div>
+  <!-- ── REDIRECTION CHAIN INSPECTION MODAL (CALLED FROM WORKSPACE) ── -->
+  <div id="redirect-chain-modal" class="redirect-modal-overlay" onclick="handleModalBackdropClick(event)">
+    <div class="redirect-modal-box">
+      <button class="redirect-modal-close-btn" onclick="closeRedirectModal()">&times;</button>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <span style="font-size:1.5rem;">🔀</span>
+        <div>
+          <h3 style="margin:0; font-size:1.2rem; color:var(--cyan);">Extracted URL Redirection Chain Trace</h3>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">Hop-by-hop resolution from email hyperlink to final landing page</div>
+        </div>
+      </div>
 
-  <!-- Main Controller Scripts -->
-  <script src="static/js/app.js"></script>
-  <script src="static/js/demo_data.js"></script>
-  <script src="static/js/forensics.js"></script>
+      <div id="modal-hops-container" class="redirect-flow-canvas" style="margin: 16px 0;">
+        <!-- Dynamically injected -->
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.08); padding-top:16px; margin-top:16px;">
+        <div id="modal-verdict-summary" style="font-size:0.85rem; color:var(--text);">--</div>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="closeRedirectModal()">Close</button>
+          <button class="btn btn-primary btn-sm" onclick="openCurrentUrlInTracer()">Open in Full Redirection Tracer ➔</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-stack"></div>
+
+  <!-- Core Scripts -->
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/demo_data.js"></script>
+  <script src="/static/js/forensics.js"></script>
 </body>
 </html>
