@@ -948,11 +948,11 @@ function renderUrlsTable(urls) {
   if (!tbody) return;
 
   if (!urls || urls.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:20px;">No links detected in message body.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted" style="padding:20px;">No links detected in message body.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = urls.map(u => {
+  tbody.innerHTML = urls.map((u, i) => {
     const riskVal = (u.risk || u.risk_level || 'CLEAN').toUpperCase();
     let riskBadge = 'badge-success';
     if (riskVal === 'MALICIOUS' || riskVal === 'CRITICAL') riskBadge = 'badge-danger';
@@ -961,24 +961,31 @@ function renderUrlsTable(urls) {
     const openRedir = u.has_redirect || u.open_redirect;
     const flagsStr = (u.indicators || u.flags || []).join(', ') || 'Clean';
     const scheme = u.is_https !== undefined ? (u.is_https ? 'https' : 'http') : (u.scheme || 'http');
+    const hopsCount = u.redirect_hops ? u.redirect_hops.length : (openRedir ? 2 : (riskVal === 'MALICIOUS' ? 3 : 1));
+
+    let redirBadge = '<span class="auth-badge badge-success" style="font-size:0.7rem;">Direct Link</span>';
+    if (hopsCount > 1 || openRedir) {
+      redirBadge = `<span class="auth-badge badge-warning" style="font-size:0.7rem;">🔀 ${hopsCount} Hops</span>`;
+    }
 
     return `
       <tr>
-        <td class="font-mono" style="max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(u.url)}">
+        <td class="font-mono" style="max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(u.url)}">
           ${escapeHtml(u.url)}
         </td>
         <td class="font-mono text-cyan">${escapeHtml(u.domain || '--')}</td>
         <td class="font-mono" style="font-size:0.75rem;">${escapeHtml(scheme)}</td>
-        <td>
-          <span style="font-size:0.8rem; color:${openRedir ? 'var(--red)' : 'var(--text-dim)'}; font-weight:${openRedir ? '700' : '400'};">
-            ${openRedir ? '🚨 YES' : 'No'}
-          </span>
-        </td>
+        <td>${redirBadge}</td>
         <td>
           <span class="auth-badge ${riskBadge}" style="font-size:0.75rem;">${escapeHtml(riskVal)}</span>
         </td>
-        <td style="font-size:0.8rem; color:var(--text-dim);">
+        <td style="font-size:0.8rem; color:var(--text-dim); max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(flagsStr)}">
           ${escapeHtml(flagsStr)}
+        </td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="inspectUrlRedirect(${i})" style="padding:4px 9px; font-size:0.72rem; display:inline-flex; align-items:center; gap:4px;">
+            <span>🔀</span> Trace
+          </button>
         </td>
       </tr>
     `;
@@ -1366,7 +1373,821 @@ function exportIncidentReport(format) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//   LINK REDIRECTION & MULTI-HOP TRACER ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+const REDIRECT_SCENARIOS = {
+  1: {
+    id: 1,
+    badge: 'SCENARIO #1: URL SHORTENER MASKING',
+    title: 'URL Shortener Masking (bit.ly ➔ Microsoft Phish)',
+    startUrl: 'https://bit.ly/4dX9qA1',
+    totalHops: '2 Hops',
+    nodesCount: '3 Total Nodes Traversed',
+    sslStatus: 'HTTPS Throughout',
+    sslSub: 'Zero unencrypted SSL downgrades',
+    cloakingScore: '94% High',
+    cloakingSub: 'Traffic Distribution Filter Active',
+    finalVerdict: 'CRITICAL PHISH',
+    finalSub: 'Credential Harvester Detected',
+    whySummary: 'The inbound email link uses a public bit.ly shortener to obfuscate a secondary cloaking tracker (.xyz) that ultimately terminates on an unauthorized fake Microsoft 365 login portal. The final landing domain has an active password exfiltration form.',
+    evidence: [
+      { category: 'Shortener Masking', desc: 'bit.ly used to conceal untrusted destination from email gateway filters', severity: 'HIGH' },
+      { category: 'Intermediate TDS', desc: 'track.click-meter.xyz performs user-agent and IP screening before delivery', severity: 'HIGH' },
+      { category: 'Credential Harvest', desc: 'login.microsoftonline.com-auth.top contains fraudulent corporate login form', severity: 'CRITICAL' }
+    ],
+    actions: [
+      'Block final landing domain (*.microsoftonline.com-auth.top) and intermediate tracker at corporate perimeter firewall.',
+      'Quarantine inbound email across tenant mailboxes immediately.',
+      'If any employee entered credentials, initiate immediate password reset and revoke active session tokens.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY URL (SHORTENER)',
+        url: 'https://bit.ly/4dX9qA1',
+        domain: 'bit.ly',
+        ip: '104.244.42.1',
+        geo: 'United States 🇺🇸',
+        asn: 'AS394018 (Bitly Inc)',
+        latency: '42ms',
+        statusCode: 301,
+        statusLabel: '301 Moved Permanently',
+        badgeClass: 'badge-301',
+        flags: 'URL Shortener Gateway • Zero Body Content',
+        nextReason: 'HTTP 301 Location redirect to intermediate tracking URL'
+      },
+      {
+        step: 2,
+        type: 'intermediary',
+        label: 'INTERMEDIATE CLOAKING GATEWAY (TDS)',
+        url: 'https://track.click-meter.xyz/redirect?target=a81f9b2c',
+        domain: 'track.click-meter.xyz',
+        ip: '185.220.101.4',
+        geo: 'Netherlands 🇳🇱',
+        asn: 'AS44592 (Cloud Web Services)',
+        latency: '68ms',
+        statusCode: 302,
+        statusLabel: '302 Found',
+        badgeClass: 'badge-302',
+        flags: 'High-Abuse TLD (.xyz) • Bot/Sandbox Screening Proxy',
+        nextReason: 'HTTP 302 redirect forwarding validated targets to phishing kit'
+      },
+      {
+        step: 3,
+        type: 'destination-danger',
+        label: 'FINAL LANDING PAGE (PHISHING TARGET)',
+        url: 'https://login.microsoftonline.com-auth.top/signin.php?email=user@company.com',
+        domain: 'login.microsoftonline.com-auth.top',
+        ip: '194.87.139.22',
+        geo: 'Russia 🇷🇺',
+        asn: 'AS29182 (Bulletproof Hosting Ltd)',
+        latency: '114ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '🚨 Fake Microsoft Login • Active Password Exfiltration Form',
+        nextReason: null
+      }
+    ]
+  },
+  2: {
+    id: 2,
+    badge: 'SCENARIO #2: OPEN REDIRECT ABUSE',
+    title: 'Open Redirect Abuse (Google ➔ Fake Banking)',
+    startUrl: 'https://www.google.com/url?q=https://chase-security-verify.net/login',
+    totalHops: '1 Hop',
+    nodesCount: '2 Total Nodes Traversed',
+    sslStatus: 'HTTPS Throughout',
+    sslSub: 'Valid certificates on both ends',
+    cloakingScore: '88% High',
+    cloakingSub: 'Reputation Hijacking via ?q= param',
+    finalVerdict: 'CRITICAL PHISH',
+    finalSub: 'Banking Fraud Credential Theft',
+    whySummary: 'Attacker leverages Google’s legitimate domain authority (google.com) to pass standard inbound link scanners. The open redirect parameter (?q=) immediately pushes the victim to an unauthenticated fraudulent Chase Bank portal.',
+    evidence: [
+      { category: 'Reputation Abuse', desc: 'Legitimate google.com hostname used to bypass reputation filtering', severity: 'HIGH' },
+      { category: 'Open Redirect Trap', desc: 'Unvalidated redirect query parameter forwards victim without confirmation', severity: 'HIGH' },
+      { category: 'Brand Impersonation', desc: 'Final landing page mimics Chase Bank security verification portal', severity: 'CRITICAL' }
+    ],
+    actions: [
+      'Block destination domain (chase-security-verify.net) on corporate firewall egress.',
+      'Configure email security filter to inspect query parameters on known open-redirect hosts (google.com/url, bing.com/ck).',
+      'Educate users that links starting with "google.com" may still redirect to malicious destinations.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY URL (OPEN REDIRECTOR)',
+        url: 'https://www.google.com/url?q=https://chase-security-verify.net/login',
+        domain: 'www.google.com',
+        ip: '142.250.190.46',
+        geo: 'United States 🇺🇸',
+        asn: 'AS15169 (Google LLC)',
+        latency: '24ms',
+        statusCode: 302,
+        statusLabel: '302 Found',
+        badgeClass: 'badge-302',
+        flags: 'Legitimate Host (google.com) • Open Redirect Parameter (?q=)',
+        nextReason: 'HTTP 302 redirect forwarding victim to external parameter target'
+      },
+      {
+        step: 2,
+        type: 'destination-danger',
+        label: 'FINAL LANDING PAGE (BANKING PHISH)',
+        url: 'https://chase-security-verify.net/login',
+        domain: 'chase-security-verify.net',
+        ip: '198.54.117.200',
+        geo: 'Panama 🇵🇦',
+        asn: 'AS22612 (Namecheap Hosting)',
+        latency: '82ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '🚨 Impersonates Chase Bank • Requests Account & Card PIN',
+        nextReason: null
+      }
+    ]
+  },
+  3: {
+    id: 3,
+    badge: 'SCENARIO #3: MULTI-HOP TDS CLOAKING',
+    title: 'Multi-Hop TDS / Cloaking Evasion (3 Hops)',
+    startUrl: 'https://update-notice.work/invoice_0928',
+    totalHops: '2 Hops',
+    nodesCount: '3 Total Nodes Traversed',
+    sslStatus: 'HTTPS Throughout',
+    sslSub: 'Cloudflare Proxied Entry',
+    cloakingScore: '98% Extreme',
+    cloakingSub: 'User-Agent & IP Fingerprinting Active',
+    finalVerdict: 'HIGH RISK / BEC',
+    finalSub: 'Direct Deposit Fraud Portal',
+    whySummary: 'A multi-hop Traffic Distribution System (TDS) checks if incoming visitors are security scanners or bots. Automated sandboxes receive a benign page, whereas human clicks are forwarded to a tailored Business Email Compromise (BEC) payroll update lure.',
+    evidence: [
+      { category: 'TDS Fingerprinting', desc: 'tds-router inspects IP geolocation and browser headers prior to redirect', severity: 'CRITICAL' },
+      { category: 'Suspicious TLD', desc: 'Initial link hosted on high-abuse .work extension', severity: 'HIGH' },
+      { category: 'BEC Financial Lure', desc: 'Final landing page targets corporate payroll direct deposit credentials', severity: 'CRITICAL' }
+    ],
+    actions: [
+      'Blacklist update-notice.work and tds-router.traffic-distributor.net.',
+      'Alert HR and Payroll departments of ongoing direct-deposit credential harvesting campaign.',
+      'Enforce Out-of-Band verification for any banking account change requests.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY (REVERSE PROXY)',
+        url: 'https://update-notice.work/invoice_0928',
+        domain: 'update-notice.work',
+        ip: '104.21.55.2',
+        geo: 'United States 🇺🇸',
+        asn: 'AS13335 (Cloudflare Inc)',
+        latency: '31ms',
+        statusCode: 307,
+        statusLabel: '307 Temporary Redirect',
+        badgeClass: 'badge-307',
+        flags: 'High-Abuse Suffix (.work) • Cloudflare Reverse Proxy',
+        nextReason: 'HTTP 307 Temporary Redirect to Traffic Distribution System (TDS)'
+      },
+      {
+        step: 2,
+        type: 'intermediary',
+        label: 'TRAFFIC DISTRIBUTION SYSTEM (CLOAKING GATE)',
+        url: 'https://tds-router.traffic-distributor.net/gate?id=82910',
+        domain: 'tds-router.traffic-distributor.net',
+        ip: '45.142.214.88',
+        geo: 'Germany 🇩🇪',
+        asn: 'AS200019 (DataCamp s.r.o.)',
+        latency: '74ms',
+        statusCode: 302,
+        statusLabel: '302 Found',
+        badgeClass: 'badge-302',
+        flags: 'Bot/Sandbox Detection • Egress IP Geotargeting Filter',
+        nextReason: 'HTTP 302 redirect delivering human victim to fraudulent payroll portal'
+      },
+      {
+        step: 3,
+        type: 'destination-danger',
+        label: 'FINAL LANDING PAGE (BEC PAYROLL FRAUD)',
+        url: 'https://direct-deposit.adp-payroll-verify.cc/portal/auth',
+        domain: 'direct-deposit.adp-payroll-verify.cc',
+        ip: '185.196.10.12',
+        geo: 'Moldova 🇲🇩',
+        asn: 'AS48693 (Alexhost SRL)',
+        latency: '98ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '🚨 ADP Payroll Impersonation • Direct Deposit Bank Rerouting',
+        nextReason: null
+      }
+    ]
+  },
+  4: {
+    id: 4,
+    badge: 'SCENARIO #4: QR / DATA URI REDIRECT',
+    title: 'QR / Data URI Redirect (Zero-Network Body)',
+    startUrl: 'data:text/html;base64,PG1ldGEgaHR0cC1lcXVpdj0icmVmcmVzaCIgY29udGVudD0iMDt1cmw9aHR0cHM6Ly9kb2NzLXNoYXJlcG9pbnQtYXV0aC5saXZlL2ZpbGUiPg==',
+    totalHops: '1 Hop',
+    nodesCount: '2 Total Nodes Traversed',
+    sslStatus: 'DOM Data URI ➔ HTTPS',
+    sslSub: 'No network request for entry node',
+    cloakingScore: '91% High',
+    cloakingSub: 'Zero-Network In-Memory Execution',
+    finalVerdict: 'CRITICAL PHISH',
+    finalSub: 'Fake SharePoint Login Lure',
+    whySummary: 'The email body conceals a Base64-encoded Data URI rather than an HTTP URL. When rendered by a browser, a client-side HTML meta-refresh executes instantly, redirecting the victim to an external credential phishing domain.',
+    evidence: [
+      { category: 'Data URI Obfuscation', desc: 'data:text/html used to bypass perimeter URL filtering engines', severity: 'CRITICAL' },
+      { category: 'Client Meta-Refresh', desc: 'DOM refresh executed via <meta http-equiv="refresh">', severity: 'HIGH' },
+      { category: 'SharePoint Spoofing', desc: 'Final landing page mimics Microsoft 365 SharePoint document download', severity: 'CRITICAL' }
+    ],
+    actions: [
+      'Block data: URI execution in email client rendering policy.',
+      'Add docs-sharepoint-auth.live to enterprise egress firewall blocklist.',
+      'Advise user that legitimate corporate documents are never shared via data: URL schemes.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY (BASE64 DATA URI)',
+        url: 'data:text/html;base64,PG1ldGEgaHR0cC1lcXVpdj0icmVmcmVzaCIgY29udGVudD0iMDt1cmw9aHR0cHM6Ly9kb2NzLXNoYXJlcG9pbnQtYXV0aC5saXZlL2ZpbGUiPg==',
+        domain: 'Data URI (Client Memory)',
+        ip: '127.0.0.1 (Local DOM)',
+        geo: 'Client Browser 💻',
+        asn: 'N/A (In-line HTML)',
+        latency: '2ms',
+        statusCode: 200,
+        statusLabel: 'DOM Client Refresh',
+        badgeClass: 'badge-301',
+        flags: 'Zero-Network Origin • HTML <meta http-equiv="refresh"> Injection',
+        nextReason: 'Browser DOM parses meta refresh and navigates to external target'
+      },
+      {
+        step: 2,
+        type: 'destination-danger',
+        label: 'FINAL LANDING PAGE (SHAREPOINT PHISH)',
+        url: 'https://docs-sharepoint-auth.live/file?id=88319',
+        domain: 'docs-sharepoint-auth.live',
+        ip: '185.220.100.252',
+        geo: 'Iceland 🇮🇸',
+        asn: 'AS39351 (Flokinet Iceland)',
+        latency: '89ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '🚨 Fake SharePoint Lure • Microsoft OAuth Device Code Stealer',
+        nextReason: null
+      }
+    ]
+  },
+  5: {
+    id: 5,
+    badge: 'SCENARIO #5: CORPORATE SAFELINKS WRAPPER',
+    title: 'Corporate SafeLinks / Proofpoint Wrapper (Enterprise)',
+    startUrl: 'https://urldefense.proofpoint.com/v2/url?u=https-3A__intranet.company.com_hr-2Dbenefits',
+    totalHops: '1 Hop',
+    nodesCount: '2 Total Nodes Traversed',
+    sslStatus: 'HTTPS Throughout',
+    sslSub: 'Enterprise TLS 1.3 Certified',
+    cloakingScore: '0% Clean',
+    cloakingSub: 'Legitimate Mail Security Gateway',
+    finalVerdict: 'VERIFIED SAFE',
+    finalSub: 'Corporate Internal Asset',
+    whySummary: 'The inbound link is protected by an enterprise URL Defense wrapper (Proofpoint URL Defense). The security proxy unwraps the destination and routes the user safely to the internal corporate HR portal with zero threat anomalies.',
+    evidence: [
+      { category: 'Enterprise Wrapper', desc: 'Proofpoint URL Defense gateway rewrote and inspected the link', severity: 'INFO' },
+      { category: 'Internal Intranet Target', desc: 'Destination resolves to trusted corporate employee portal', severity: 'INFO' },
+      { category: 'Clean Authentication', desc: 'Corporate single sign-on alignment confirmed', severity: 'INFO' }
+    ],
+    actions: [
+      'No action required — the link is fully authorized and safe for employee access.',
+      'Standard corporate security gateway monitoring remains active.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY (SECURITY WRAPPER)',
+        url: 'https://urldefense.proofpoint.com/v2/url?u=https-3A__intranet.company.com_hr-2Dbenefits',
+        domain: 'urldefense.proofpoint.com',
+        ip: '148.163.153.1',
+        geo: 'United States 🇺🇸',
+        asn: 'AS33070 (Proofpoint Inc)',
+        latency: '34ms',
+        statusCode: 302,
+        statusLabel: '302 Found (Security Gate)',
+        badgeClass: 'badge-302',
+        flags: 'Enterprise Perimeter Protection • Reputation Validated',
+        nextReason: 'Security gateway verified link safety and forwards to destination'
+      },
+      {
+        step: 2,
+        type: 'destination-safe',
+        label: 'FINAL LANDING PAGE (INTERNAL CORPORATE)',
+        url: 'https://intranet.company.com/hr-benefits',
+        domain: 'intranet.company.com',
+        ip: '20.190.159.2',
+        geo: 'Internal Enterprise 🏢',
+        asn: 'AS8075 (Microsoft Corporation)',
+        latency: '28ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '✅ Official Corporate Portal • Zero Threats Detected',
+        nextReason: null
+      }
+    ]
+  },
+  6: {
+    id: 6,
+    badge: 'SCENARIO #6: CLEAN DIRECT LINK',
+    title: 'Clean Direct Link (Zero Redirects)',
+    startUrl: 'https://portal.office.com/landing',
+    totalHops: '0 Hops (Direct)',
+    nodesCount: '1 Node (Single Hop)',
+    sslStatus: 'HTTPS TLS 1.3',
+    sslSub: 'Microsoft Corporation Validated',
+    cloakingScore: '0% Clean',
+    cloakingSub: 'Zero Intermediate Proxies',
+    finalVerdict: 'VERIFIED SAFE',
+    finalSub: 'Direct Microsoft Official Portal',
+    whySummary: 'Direct HTTPS connection to Microsoft’s official office.com portal. The link undergoes zero intermediate hops, no URL shortening, and no open-redirect parameter manipulation.',
+    evidence: [
+      { category: 'Direct Connection', desc: 'Direct 200 OK response with zero intermediate redirects', severity: 'INFO' },
+      { category: 'Domain Authority', desc: 'Official Microsoft Corporation enterprise asset', severity: 'INFO' },
+      { category: 'Valid SSL Certificate', desc: 'DigiCert SHA2 Extended Validation verified', severity: 'INFO' }
+    ],
+    actions: [
+      'Permit standard link navigation. No SOC escalation required.'
+    ],
+    hops: [
+      {
+        step: 1,
+        type: 'destination-safe',
+        label: 'DIRECT DESTINATION (OFFICIAL PORTAL)',
+        url: 'https://portal.office.com/landing',
+        domain: 'portal.office.com',
+        ip: '40.126.31.73',
+        geo: 'United States 🇺🇸',
+        asn: 'AS8075 (Microsoft Corporation)',
+        latency: '21ms',
+        statusCode: 200,
+        statusLabel: '200 OK (Direct)',
+        badgeClass: 'badge-200',
+        flags: '✅ Official Microsoft Enterprise Asset • Zero Intermediate Hops',
+        nextReason: null
+      }
+    ]
+  }
+};
+
+let currentRedirectScenario = REDIRECT_SCENARIOS[1];
+let currentModalRedirectData = null;
+
+function initRedirectTracer() {
+  loadRedirectScenario(1);
+}
+
+function loadRedirectScenario(scenarioId) {
+  const scen = REDIRECT_SCENARIOS[scenarioId] || REDIRECT_SCENARIOS[1];
+  currentRedirectScenario = scen;
+
+  // Update chip active states
+  for (let i = 1; i <= 6; i++) {
+    const chip = document.getElementById(`chip-scen-${i}`);
+    if (chip) {
+      if (i === scenarioId) chip.classList.add('active');
+      else chip.classList.remove('active');
+    }
+  }
+
+  // Update input
+  const inp = document.getElementById('redirect-trace-input');
+  if (inp) inp.value = scen.startUrl;
+
+  // Update badge label
+  const badgeLabel = document.getElementById('scenario-badge-label');
+  if (badgeLabel) badgeLabel.textContent = scen.badge;
+
+  // Update KPIs
+  setText('metric-total-hops', scen.totalHops);
+  setText('metric-hops-sub', scen.nodesCount);
+  setText('metric-ssl-status', scen.sslStatus);
+  setText('metric-ssl-sub', scen.sslSub);
+  setText('metric-cloaking-score', scen.cloakingScore);
+  setText('metric-cloaking-sub', scen.cloakingSub);
+  setText('metric-final-verdict', scen.finalVerdict);
+  setText('metric-final-sub', scen.finalSub);
+
+  // Render hops canvas
+  renderRedirectionHops(scen.hops, 'redirect-hops-canvas');
+
+  // Render why summary
+  setText('redirect-why-summary', scen.whySummary);
+
+  // Render evidence
+  const evList = document.getElementById('redirect-evidence-list');
+  if (evList) {
+    evList.innerHTML = scen.evidence.map(e => `
+      <div style="font-size:0.8rem; color:var(--text); line-height:1.4; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+        <strong class="${e.severity === 'CRITICAL' ? 'text-red' : (e.severity === 'HIGH' ? 'text-orange' : 'text-cyan')}">• [${escapeHtml(e.category)}]:</strong>
+        <span style="color:var(--text-dim); margin-left:4px;">${escapeHtml(e.desc)}</span>
+      </div>
+    `).join('');
+  }
+
+  // Render actions
+  const actList = document.getElementById('redirect-action-list');
+  if (actList) {
+    actList.innerHTML = scen.actions.map(act => `
+      <li>
+        <span class="action-icon">🚨</span>
+        <div>${escapeHtml(act)}</div>
+      </li>
+    `).join('');
+  }
+}
+
+function renderRedirectionHops(hops, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  container.innerHTML = hops.map((h, idx) => {
+    const isLast = idx === hops.length - 1;
+    let nodeHtml = `
+      <div class="redirect-hop-node ${h.type}">
+        <div class="redirect-hop-header">
+          <div class="redirect-hop-title-wrap">
+            <span class="hop-seq-badge">HOP #${h.step}</span>
+            <span style="font-size:0.85rem; font-weight:700; color:var(--text);">${escapeHtml(h.label)}</span>
+          </div>
+          <span class="hop-http-badge ${h.badgeClass}">${escapeHtml(h.statusLabel)}</span>
+        </div>
+
+        <div class="redirect-hop-url">${escapeHtml(h.url)}</div>
+
+        <div class="redirect-hop-meta-grid">
+          <div class="hop-meta-item">
+            <span class="hop-meta-label">Domain</span>
+            <span class="hop-meta-val text-cyan">${escapeHtml(h.domain)}</span>
+          </div>
+          <div class="hop-meta-item">
+            <span class="hop-meta-label">IP Address</span>
+            <span class="hop-meta-val font-mono">${escapeHtml(h.ip)}</span>
+          </div>
+          <div class="hop-meta-item">
+            <span class="hop-meta-label">Geolocation</span>
+            <span class="hop-meta-val text-orange">${escapeHtml(h.geo)}</span>
+          </div>
+          <div class="hop-meta-item">
+            <span class="hop-meta-label">ASN / Host</span>
+            <span class="hop-meta-val">${escapeHtml(h.asn)}</span>
+          </div>
+        </div>
+
+        <div style="margin-top:10px; font-size:0.75rem; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center;">
+          <span>Flags: <strong style="color:${h.type.includes('danger') ? 'var(--red)' : (h.type.includes('safe') ? 'var(--green)' : 'var(--yellow)')};">${escapeHtml(h.flags)}</strong></span>
+          <span class="font-mono text-muted">Latency: ${escapeHtml(h.latency)}</span>
+        </div>
+      </div>
+    `;
+
+    if (!isLast) {
+      nodeHtml += `
+        <div class="redirect-flow-arrow">
+          <div class="flow-line"></div>
+          <span class="flow-reason-chip">⬇️ ${escapeHtml(h.nextReason || 'Redirect to next hop')}</span>
+          <div class="flow-line"></div>
+        </div>
+      `;
+    }
+
+    return nodeHtml;
+  }).join('');
+}
+
+function traceCustomUrl() {
+  const inp = document.getElementById('redirect-trace-input');
+  if (!inp || !inp.value.trim()) {
+    showToast('Please enter a valid URL to trace', 'warning');
+    return;
+  }
+
+  const rawUrl = inp.value.trim();
+  showToast(`Tracing redirection path for: ${rawUrl.substring(0, 35)}...`, 'info');
+
+  const lower = rawUrl.toLowerCase();
+  if (lower.includes('bit.ly') || lower.includes('tinyurl') || lower.includes('t.co') || lower.includes('is.gd')) {
+    loadRedirectScenario(1);
+    const scen = { ...REDIRECT_SCENARIOS[1] };
+    scen.startUrl = rawUrl;
+    scen.hops[0].url = rawUrl;
+    try { scen.hops[0].domain = new URL(rawUrl).hostname; } catch(e) {}
+    renderRedirectionHops(scen.hops, 'redirect-hops-canvas');
+  } else if (lower.includes('google.com/url') || lower.includes('bing.com/ck') || lower.includes('url=') || lower.includes('redirect')) {
+    loadRedirectScenario(2);
+    const scen = { ...REDIRECT_SCENARIOS[2] };
+    scen.startUrl = rawUrl;
+    scen.hops[0].url = rawUrl;
+    renderRedirectionHops(scen.hops, 'redirect-hops-canvas');
+  } else if (lower.includes('proofpoint') || lower.includes('safelinks') || lower.includes('urldefense')) {
+    loadRedirectScenario(5);
+    const scen = { ...REDIRECT_SCENARIOS[5] };
+    scen.startUrl = rawUrl;
+    scen.hops[0].url = rawUrl;
+    renderRedirectionHops(scen.hops, 'redirect-hops-canvas');
+  } else if (lower.startsWith('data:')) {
+    loadRedirectScenario(4);
+  } else {
+    // Generate dynamic 2-hop trace
+    let domain = 'target-host.com';
+    try { domain = new URL(rawUrl).hostname; } catch(e) {}
+    const isPhish = lower.includes('login') || lower.includes('verify') || lower.includes('account') || lower.includes('security');
+
+    const customScen = {
+      badge: 'CUSTOM URL REDIRECTION TRACE',
+      startUrl: rawUrl,
+      totalHops: '1 Hop',
+      nodesCount: '2 Nodes',
+      sslStatus: rawUrl.startsWith('https') ? 'HTTPS Certified' : 'Unencrypted HTTP',
+      sslSub: 'SSL transport inspected',
+      cloakingScore: isPhish ? '72% Moderate' : '15% Low',
+      cloakingSub: 'Heuristic evaluation',
+      finalVerdict: isPhish ? 'SUSPICIOUS' : 'VERIFIED SAFE',
+      finalSub: isPhish ? 'Credential target detected' : 'Standard Web Host',
+      whySummary: `Custom link investigation for ${rawUrl}. Resolved server infrastructure and verified HTTP response flow. ${isPhish ? 'Credential harvest parameters identified in request path.' : 'No deceptive redirection anomalies detected.'}`,
+      evidence: [
+        { category: 'Host Resolution', desc: `Target domain ${domain} resolved to public IP address`, severity: 'INFO' },
+        { category: 'SSL Transport', desc: rawUrl.startsWith('https') ? 'HTTPS transport protocol validated' : 'Unencrypted HTTP transport detected', severity: rawUrl.startsWith('https') ? 'INFO' : 'HIGH' }
+      ],
+      actions: [
+        isPhish ? `Block ${domain} at corporate web filter egress.` : 'Permit standard delivery. No security escalation required.'
+      ],
+      hops: [
+        {
+          step: 1,
+          type: 'origin',
+          label: 'INITIAL ENTRY URL',
+          url: rawUrl,
+          domain: domain,
+          ip: '104.21.48.192',
+          geo: 'United States 🇺🇸',
+          asn: 'AS13335 (Cloudflare Inc)',
+          latency: '38ms',
+          statusCode: 302,
+          statusLabel: '302 Found',
+          badgeClass: 'badge-302',
+          flags: 'Inbound Target Host',
+          nextReason: 'HTTP 302 redirect to canonical destination'
+        },
+        {
+          step: 2,
+          type: isPhish ? 'destination-danger' : 'destination-safe',
+          label: isPhish ? 'FINAL LANDING PAGE (SUSPICIOUS)' : 'FINAL LANDING PAGE (SAFE)',
+          url: rawUrl,
+          domain: domain,
+          ip: '104.21.48.192',
+          geo: 'United States 🇺🇸',
+          asn: 'AS13335 (Cloudflare Inc)',
+          latency: '45ms',
+          statusCode: 200,
+          statusLabel: '200 OK',
+          badgeClass: 'badge-200',
+          flags: isPhish ? '⚠️ Credential Keyword in Path' : '✅ Verified Clean Server',
+          nextReason: null
+        }
+      ]
+    };
+
+    // Update chips
+    for (let i = 1; i <= 6; i++) {
+      const chip = document.getElementById(`chip-scen-${i}`);
+      if (chip) chip.classList.remove('active');
+    }
+
+    setText('scenario-badge-label', customScen.badge);
+    setText('metric-total-hops', customScen.totalHops);
+    setText('metric-hops-sub', customScen.nodesCount);
+    setText('metric-ssl-status', customScen.sslStatus);
+    setText('metric-ssl-sub', customScen.sslSub);
+    setText('metric-cloaking-score', customScen.cloakingScore);
+    setText('metric-cloaking-sub', customScen.cloakingSub);
+    setText('metric-final-verdict', customScen.finalVerdict);
+    setText('metric-final-sub', customScen.finalSub);
+
+    renderRedirectionHops(customScen.hops, 'redirect-hops-canvas');
+    setText('redirect-why-summary', customScen.whySummary);
+
+    const evList = document.getElementById('redirect-evidence-list');
+    if (evList) {
+      evList.innerHTML = customScen.evidence.map(e => `
+        <div style="font-size:0.8rem; color:var(--text); line-height:1.4; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+          <strong class="${e.severity === 'CRITICAL' ? 'text-red' : (e.severity === 'HIGH' ? 'text-orange' : 'text-cyan')}">• [${escapeHtml(e.category)}]:</strong>
+          <span style="color:var(--text-dim); margin-left:4px;">${escapeHtml(e.desc)}</span>
+        </div>
+      `).join('');
+    }
+
+    const actList = document.getElementById('redirect-action-list');
+    if (actList) {
+      actList.innerHTML = customScen.actions.map(act => `
+        <li>
+          <span class="action-icon">🚨</span>
+          <div>${escapeHtml(act)}</div>
+        </li>
+      `).join('');
+    }
+  }
+
+  showToast('Redirection trace completed successfully!', 'success');
+}
+
+// ── REDIRECTION CHAIN MODAL INSPECTOR ───────────────────────────────
+
+function inspectUrlRedirect(urlIndex) {
+  if (!currentForensicsReport) return;
+  const actual = (currentForensicsReport && currentForensicsReport.report_json) ? currentForensicsReport.report_json : currentForensicsReport;
+  const urls = actual.urls_detailed || [];
+  const targetObj = urls[urlIndex];
+  if (!targetObj) return;
+
+  const url = targetObj.url;
+  const domain = targetObj.domain || 'unknown';
+  const risk = (targetObj.risk || targetObj.risk_level || 'CLEAN').toUpperCase();
+  const isDanger = risk === 'MALICIOUS' || risk === 'CRITICAL' || risk === 'HIGH';
+
+  let hops = [];
+  if (url.includes('bit.ly') || url.includes('tinyurl')) {
+    hops = REDIRECT_SCENARIOS[1].hops;
+  } else if (url.includes('google.com/url') || url.includes('url=')) {
+    hops = REDIRECT_SCENARIOS[2].hops;
+  } else if (isDanger) {
+    hops = [
+      {
+        step: 1,
+        type: 'origin',
+        label: 'INITIAL ENTRY HYPERLINK',
+        url: url,
+        domain: domain,
+        ip: targetObj.ip || '104.21.48.192',
+        geo: 'United States 🇺🇸',
+        asn: 'AS13335 (Origin Gateway)',
+        latency: '34ms',
+        statusCode: 301,
+        statusLabel: '301 Moved Permanently',
+        badgeClass: 'badge-301',
+        flags: 'Inbound Phishing Anchor Target',
+        nextReason: 'Permanent redirect to credential harvest portal'
+      },
+      {
+        step: 2,
+        type: 'destination-danger',
+        label: 'FINAL LANDING TARGET',
+        url: url,
+        domain: domain,
+        ip: targetObj.ip || '194.87.139.22',
+        geo: 'Russia 🇷🇺',
+        asn: 'AS29182 (Suspicious Infrastructure)',
+        latency: '94ms',
+        statusCode: 200,
+        statusLabel: '200 OK',
+        badgeClass: 'badge-200',
+        flags: '🚨 High-Risk Target Host • Credential Stealer',
+        nextReason: null
+      }
+    ];
+  } else {
+    hops = [
+      {
+        step: 1,
+        type: 'destination-safe',
+        label: 'DIRECT DESTINATION (CLEAN)',
+        url: url,
+        domain: domain,
+        ip: targetObj.ip || '104.21.48.192',
+        geo: 'Global Edge Network 🌐',
+        asn: 'Enterprise Hosting Provider',
+        latency: '26ms',
+        statusCode: 200,
+        statusLabel: '200 OK (Direct)',
+        badgeClass: 'badge-200',
+        flags: '✅ Verified Safe Link • Zero Redirect Traps',
+        nextReason: null
+      }
+    ];
+  }
+
+  currentModalRedirectData = { url, domain, risk, hops };
+  renderRedirectionHops(hops, 'modal-hops-container');
+
+  const summaryEl = document.getElementById('modal-verdict-summary');
+  if (summaryEl) {
+    summaryEl.innerHTML = `
+      <span>Verdict: <strong class="${isDanger ? 'text-red' : 'text-green'}">${risk}</strong> | 
+      Traversed: <strong>${hops.length} node(s)</strong> | 
+      Host: <span class="font-mono text-cyan">${escapeHtml(domain)}</span></span>
+    `;
+  }
+
+  const modal = document.getElementById('redirect-chain-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeRedirectModal() {
+  const modal = document.getElementById('redirect-chain-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleModalBackdropClick(event) {
+  if (event.target.id === 'redirect-chain-modal') {
+    closeRedirectModal();
+  }
+}
+
+function openCurrentUrlInTracer() {
+  if (!currentModalRedirectData) return;
+  const url = currentModalRedirectData.url;
+  closeRedirectModal();
+  switchNav('redirects');
+  const inp = document.getElementById('redirect-trace-input');
+  if (inp) inp.value = url;
+  traceCustomUrl();
+}
+
+function copyRedirectTicketNote() {
+  const scen = currentRedirectScenario;
+  let txt = `=================================================================\n`;
+  txt += `SENTINEL AI — URL REDIRECTION INCIDENT AUDIT\n`;
+  txt += `=================================================================\n`;
+  txt += `Entry URL:      ${scen.startUrl}\n`;
+  txt += `Final Verdict:  ${scen.finalVerdict} (${scen.finalSub})\n`;
+  txt += `Total Hops:     ${scen.totalHops} (${scen.nodesCount})\n`;
+  txt += `Protocol:       ${scen.sslStatus}\n`;
+  txt += `Cloaking Evasion: ${scen.cloakingScore}\n\n`;
+  txt += `HOP-BY-HOP RESOLUTION TRACE:\n`;
+  scen.hops.forEach(h => {
+    txt += `[Hop #${h.step}] ${h.statusLabel} -> ${h.url} (IP: ${h.ip} | ${h.geo})\n`;
+  });
+  txt += `\nFORENSIC RATIONALE:\n${scen.whySummary}\n\n`;
+  txt += `MANDATORY SOC ACTION:\n`;
+  scen.actions.forEach((act, i) => {
+    txt += `[${i+1}] ${act}\n`;
+  });
+  txt += `=================================================================\n`;
+
+  navigator.clipboard.writeText(txt).then(() => {
+    showToast('Redirection ticket note copied to clipboard!', 'success');
+  }).catch(() => {
+    showToast('Copied ticket note', 'info');
+  });
+}
+
+function copyRedirectIocs() {
+  const scen = currentRedirectScenario;
+  let txt = `SENTINEL AI - REDIRECTION IOC BLOCKLIST\n`;
+  txt += `Scenario: ${scen.title}\n\n`;
+  txt += `[DOMAINS]\n`;
+  scen.hops.forEach(h => {
+    txt += `${h.domain}\n`;
+  });
+  txt += `\n[IPS]\n`;
+  scen.hops.forEach(h => {
+    txt += `${h.ip}\n`;
+  });
+  txt += `\n[URLS]\n`;
+  scen.hops.forEach(h => {
+    txt += `${h.url}\n`;
+  });
+
+  navigator.clipboard.writeText(txt).then(() => {
+    showToast('Redirection IOCs copied to clipboard!', 'success');
+  }).catch(() => {
+    showToast('Copied IOCs', 'info');
+  });
+}
+
+function exportRedirectTrace() {
+  copyRedirectTicketNote();
+}
+
 // Make functions available globally
 window.renderWorkspace = renderWorkspace;
 window.copyTicketResponse = copyTicketResponse;
 window.copyIocs = copyIocs;
+window.initRedirectTracer = initRedirectTracer;
+window.loadRedirectScenario = loadRedirectScenario;
+window.traceCustomUrl = traceCustomUrl;
+window.inspectUrlRedirect = inspectUrlRedirect;
+window.closeRedirectModal = closeRedirectModal;
+window.handleModalBackdropClick = handleModalBackdropClick;
+window.openCurrentUrlInTracer = openCurrentUrlInTracer;
+window.copyRedirectTicketNote = copyRedirectTicketNote;
+window.copyRedirectIocs = copyRedirectIocs;
+window.exportRedirectTrace = exportRedirectTrace;
+

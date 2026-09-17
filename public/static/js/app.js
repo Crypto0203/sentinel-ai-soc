@@ -33,6 +33,8 @@ function switchNav(tabName) {
     loadRecentCasesHub();
   } else if (tabName === 'history') {
     loadFullCaseHistory();
+  } else if (tabName === 'redirects') {
+    if (window.initRedirectTracer) window.initRedirectTracer();
   }
 }
 
